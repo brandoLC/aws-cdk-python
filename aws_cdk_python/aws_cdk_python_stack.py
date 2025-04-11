@@ -1,67 +1,36 @@
-from aws_cdk import (
-    Stack,
-    aws_ec2 as ec2,
-    aws_iam as iam,
-)
-from constructs import Construct
 
-class AwsCdkPythonStack(Stack):
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-        super().__init__(scope, construct_id, **kwargs)
+from aws_cdk import App, Stack  # Importa App y Stack desde aws-cdk-lib
+import aws_cdk.aws_ec2 as ec2
+import aws_cdk.aws_iam as iam
 
-        # Reemplaza con tu Account ID
-        account_id = "248056481657"
-        region = cdk.Aws.REGION
+class AwsCdkPythonStack(Stack):  # Usar Stack de aws-cdk-lib en lugar de core.Stack
+    def __init__(self, scope: App, id: str, **kwargs) -> None:
+        super().__init__(scope, id, **kwargs)
 
-        # Utiliza el Rol de servicio IAM existente
-        ec2_role = iam.Role.from_role_arn(
-            self,
-            "LabRole",
-            f"arn:aws:iam::{account_id}:role/LabRole",
-            mutable=False  # Asegura que el rol no se modifique
-        )
+        # Aquí defines los recursos, como instancias EC2, roles IAM, etc.
+        # Por ejemplo, una instancia EC2:
 
-        # Busca la AMI de Cloud9 Ubuntu 22.04 (ajusta el filtro según tu región)
-        ami = ec2.MachineImage.lookup(
-            name="Cloud9ubuntu22*",
-            owners=["amazon"] # Los dueños de las AMIs de AWS suelen ser "amazon"
-        )
+        role = iam.Role.from_role_arn(self, "LabRole",
+                                      role_arn="arn:aws:iam::248056481657:role/LabRole")  # Reemplaza con tu ARN real
 
-        if not ami:
-            raise Exception("No se encontró la AMI Cloud9ubuntu22 en esta región.")
+        # Crear la VPC
+        vpc = ec2.Vpc(self, "VPC", max_azs=3)  # Crea una VPC con 3 zonas de disponibilidad
 
-        # Crea el grupo de seguridad para permitir SSH y HTTP
-        security_group = ec2.SecurityGroup(
-            self,
-            "VockeySG",
-            vpc=ec2.Vpc.from_lookup(self, "DefaultVPC", is_default=True),
-            allow_all_outbound=True,
-            description="Grupo de seguridad para la instancia vockey",
-        )
-        security_group.add_ingress_rule(
-            ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Permitir SSH"
-        )
-        security_group.add_ingress_rule(
-            ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Permitir HTTP"
-        )
+        # Crear una instancia EC2
+        instance = ec2.Instance(self, "MyEC2Instance",
+                                instance_type=ec2.InstanceType("t2.micro"),  # Tipo de instancia
+                                machine_image=ec2.MachineImage.generic_linux({"us-east-1": "ami-0b898040803850657"}),  # AMI de Cloud9ubuntu22
+                                vpc=vpc,  # Asocia la instancia a la VPC creada
+                                role=role,  # Asocia el rol IAM
+                                key_name="vockey",  # Nombre de la clave SSH
+                                security_group=ec2.SecurityGroup(self, "SecurityGroup", vpc=vpc),  # Seguridad
+                                block_devices=[ec2.BlockDevice(
+                                    device_name="/dev/sdh",  # Nombre del dispositivo
+                                    volume=ec2.BlockDeviceVolume.ebs(20)  # Tamaño del disco (20GB)
+                                )]
+                                )
 
-        # Crea la instancia EC2
-        instance = ec2.Instance(
-            self,
-            "VockeyInstance",
-            instance_type=ec2.InstanceType("t2.micro"), # Puedes elegir un tipo de instancia diferente
-            machine_image=ami,
-            security_group=security_group,
-            key_name="vockey",
-            block_devices=[
-                ec2.BlockDevice(
-                    device_name="/dev/sda1",
-                    volume=ec2.BlockDeviceVolume.ebs(20, delete_on_termination=True)
-                )
-            ],
-            role=ec2_role # Asocia el rol de servicio IAM
-        )
+        # Abre puertos SSH (22) y HTTP (80)
+        instance.connections.allow_from_any_ipv4(ec2.Port.tcp(22))  # Permite el acceso por SSH
+        instance.connections.allow_from_any_ipv4(ec2.Port.tcp(80))  # Permite el acceso por HTTP
 
-app = cdk.App()
-AwsCdkPythonStack(app, "AwsCdkPythonStack") # Usamos el nombre por defecto
-app.synth()
