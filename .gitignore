@@ -1,10 +1,22 @@
-*.swp
-package-lock.json
-__pycache__
-.pytest_cache
-.venv
-*.egg-info
 
-# CDK asset staging directory
-.cdk.staging
-cdk.out
+# Ignorar el entorno virtual de Python
+.env/
+
+# Ignorar dependencias instaladas por pip
+*.egg-info/
+*.eggs/
+
+# Ignorar archivos de configuración de AWS CDK
+.cdk.out/
+
+# Ignorar credenciales de AWS
+.aws/
+
+# Archivos de configuración de IDEs
+.idea/
+.vscode/
+
+# Archivos generados por sistemas de OS (como macOS)
+.DS_Store
+Thumbs.db
+
